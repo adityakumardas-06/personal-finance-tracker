@@ -3,9 +3,10 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
 
-// 🔴 Pehle: const API_BASE = 'https://personal-finance-tracker-1nlk.onrender.com';';
+// 🔴 Pehle: const API_BASE = 'https://personal-finance-tracker-1nlk.onrender.com';
 // 🟢 Ab Render backend ka URL:
-const API_BASE = 'https://personal-finance-tracker-1mlkr.onrender.com';
+//const API_BASE = 'https://personal-finance-tracker-1mlkr.onrender.com';
+const API_BASE = 'https://personal-finance-tracker-1nlk.onrender.com';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('admin@example.com'); // convenience ke liye
