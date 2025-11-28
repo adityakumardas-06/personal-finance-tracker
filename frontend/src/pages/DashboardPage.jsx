@@ -1,8 +1,7 @@
 // frontend/src/pages/DashboardPage.jsx
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
-
-const API_BASE = 'https://personal-finance-tracker-1nko.onrender.com';
+const API_BASE = 'https://personal-finance-tracker-1nlk.onrender.com';
 
 export default function DashboardPage() {
   const { user, token, logout } = useAuth();

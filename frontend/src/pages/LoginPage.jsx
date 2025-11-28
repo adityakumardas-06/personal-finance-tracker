@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
 
-// 🔴 Pehle: const API_BASE = 'http://localhost:5000';
+// 🔴 Pehle: const API_BASE = 'https://personal-finance-tracker-1nlk.onrender.com';';
 // 🟢 Ab Render backend ka URL:
 const API_BASE = 'https://personal-finance-tracker-1nko.onrender.com';
 
