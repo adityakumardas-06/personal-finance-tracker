@@ -12,6 +12,17 @@ import { authRequired, requireRole } from './middleware/authMiddleware.js';
 
 const app = express();
 
+// ---- CORS CONFIG ----
+// ---- CORS CONFIG (dev: sab allowed) ----
+app.use(
+  cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+app.options('*', cors());
+
 // ---- Rate Limits ----
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -31,9 +42,8 @@ const analyticsLimiter = rateLimit({
   message: { message: 'Too many analytics requests, please try again later.' },
 });
 
-// ---- Middleware ----
+// ---- Security / misc Middleware ----
 app.use(helmet());
-app.use(cors());
 app.use(express.json());
 app.use(xss());
 app.use(morgan('dev'));

@@ -1,296 +1,365 @@
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { useAuth } from "../context/AuthContext";
+// frontend/src/pages/DashboardPage.jsx
+import { useEffect, useState } from 'react';
+import { useAuth } from '../context/AuthContext.jsx';
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_BASE = 'http://localhost:5000';
 
 export default function DashboardPage() {
   const { user, token, logout } = useAuth();
 
   const [transactions, setTransactions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [loadingList, setLoadingList] = useState(true);
+
+  const [amount, setAmount] = useState('');
+  const [type, setType] = useState('expense'); // 'income' / 'expense'
+  const [date, setDate] = useState('');
+  const [description, setDescription] = useState('');
+
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  const [form, setForm] = useState({
-    amount: "",
-    type: "expense",
-    description: "",
-    transactionDate: "",
-  });
-
-  const loadTransactions = async () => {
-    try {
-      setLoading(true);
-      setError("");
-      const res = await axios.get(`${API_URL}/api/transactions`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setTransactions(res.data || []);
-    } catch (err) {
-      setError(
-        err.response?.data?.message || "Failed to load transactions from API"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // --------- Load transactions on mount ----------
   useEffect(() => {
-    if (token) loadTransactions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!token) return;
+
+    async function fetchTransactions() {
+      setLoadingList(true);
+      setError('');
+
+      try {
+        const res = await fetch(`${API_BASE}/api/transactions`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        console.log('GET /api/transactions status =', res.status);
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          console.log('ERROR BODY (GET) =>', errData);
+          throw new Error(errData.message || 'Failed to load transactions');
+        }
+
+        const data = await res.json();
+        console.log('GET /api/transactions data =', data);
+
+        const list = Array.isArray(data.transactions)
+          ? data.transactions
+          : Array.isArray(data)
+          ? data
+          : [];
+
+        setTransactions(list);
+      } catch (err) {
+        console.error('LOAD TRANSACTIONS ERROR =>', err);
+        setError(err.message || 'Could not load transactions');
+        setTransactions([]);
+      } finally {
+        setLoadingList(false);
+      }
+    }
+
+    fetchTransactions();
   }, [token]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e) => {
+  // --------- Add new transaction ----------
+  async function handleAddTransaction(e) {
     e.preventDefault();
-    if (user?.role === "read-only") {
-      setError("Read-only user cannot create transactions.");
-      return;
-    }
-
-    if (!form.amount || !form.transactionDate || !form.type) {
-      setError("Please fill amount, type and date.");
-      return;
-    }
+    setError('');
+    setSaving(true);
 
     try {
-      setSaving(true);
-      setError("");
-      await axios.post(
-        `${API_URL}/api/transactions`,
-        {
-          amount: Number(form.amount),
-          type: form.type,
-          description: form.description || "",
-          transactionDate: form.transactionDate,
-          categoryId: null,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const payload = {
+        amount: Number(amount),
+        type,
+        transactionDate: date,          // 🔥 yahan fix: `date` -> `transactionDate`
+        description: description || null,
+      };
 
-      setForm({
-        amount: "",
-        type: "expense",
-        description: "",
-        transactionDate: "",
+      console.log('POST /api/transactions payload =', payload);
+
+      const res = await fetch(`${API_BASE}/api/transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
       });
 
-      await loadTransactions();
+      console.log('POST /api/transactions status =', res.status);
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        console.log('ERROR BODY (POST) =>', errData);
+        throw new Error(errData.message || 'Failed to save transaction');
+      }
+
+      const data = await res.json();
+      console.log('POST /api/transactions data =', data);
+
+      const newTx =
+        data.transaction || data.newTransaction || data.transactionCreated || data;
+
+      if (Array.isArray(newTx)) {
+        setTransactions(newTx);
+      } else {
+        setTransactions(prev => [newTx, ...prev]);
+      }
+
+      // form clear
+      setAmount('');
+      setDescription('');
+      setType('expense');
+      setDate('');
     } catch (err) {
-      setError(
-        err.response?.data?.message || "Failed to create transaction."
-      );
+      console.error('ADD TRANSACTION ERROR =>', err);
+      setError(err.message || 'Could not save transaction');
     } finally {
       setSaving(false);
     }
-  };
+  }
 
-  const isReadOnly = user?.role === "read-only";
-
+  // --------- UI ----------
   return (
-    <div style={{ maxWidth: "900px", margin: "20px auto", fontFamily: "sans-serif" }}>
-      <div
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '1.5rem',
+        fontFamily: 'sans-serif',
+      }}
+    >
+      <header
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "20px",
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '1rem',
         }}
       >
-        <h1>Dashboard</h1>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: "14px" }}>
-            Logged in as <b>{user?.email}</b> ({user?.role})
-          </div>
+        <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>Dashboard</h1>
+        <div>
+          <span style={{ marginRight: '1rem', fontSize: '0.9rem' }}>
+            Logged in as {user?.email} ({user?.role})
+          </span>
           <button
             onClick={logout}
             style={{
-              marginTop: "8px",
-              padding: "6px 12px",
-              background: "#e53e3e",
-              color: "#fff",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
+              backgroundColor: '#ef4444',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '0.5rem 1rem',
+              cursor: 'pointer',
             }}
           >
             Logout
           </button>
         </div>
-      </div>
+      </header>
 
       {error && (
         <div
           style={{
-            marginBottom: "12px",
-            padding: "8px 12px",
-            background: "#fed7d7",
-            color: "#c53030",
-            borderRadius: "4px",
-            fontSize: "14px",
+            color: 'red',
+            marginBottom: '0.75rem',
+            fontSize: '0.9rem',
           }}
         >
           {error}
         </div>
       )}
 
-      <div
-        style={{
-          marginBottom: "24px",
-          padding: "16px",
-          border: "1px solid #e2e8f0",
-          borderRadius: "6px",
-        }}
-      >
-        <h3 style={{ marginBottom: "10px" }}>Add Transaction</h3>
-        {isReadOnly && (
-          <div
-            style={{
-              marginBottom: "8px",
-              fontSize: "13px",
-              color: "#718096",
-            }}
-          >
-            You are a <b>read-only</b> user. Creating transactions is disabled.
-          </div>
-        )}
-        <form
-          onSubmit={handleSubmit}
-          style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}
-        >
-          <input
-            type="number"
-            name="amount"
-            placeholder="Amount"
-            value={form.amount}
-            onChange={handleChange}
-            disabled={isReadOnly || saving}
-            style={{ flex: "1 0 120px", padding: "6px" }}
-          />
-          <select
-            name="type"
-            value={form.type}
-            onChange={handleChange}
-            disabled={isReadOnly || saving}
-            style={{ flex: "1 0 120px", padding: "6px" }}
-          >
-            <option value="expense">Expense</option>
-            <option value="income">Income</option>
-          </select>
-          <input
-            type="date"
-            name="transactionDate"
-            value={form.transactionDate}
-            onChange={handleChange}
-            disabled={isReadOnly || saving}
-            style={{ flex: "1 0 160px", padding: "6px" }}
-          />
-          <input
-            type="text"
-            name="description"
-            placeholder="Description (optional)"
-            value={form.description}
-            onChange={handleChange}
-            disabled={isReadOnly || saving}
-            style={{ flex: "2 0 200px", padding: "6px" }}
-          />
-          <button
-            type="submit"
-            disabled={isReadOnly || saving}
-            style={{
-              padding: "6px 16px",
-              background: isReadOnly ? "#a0aec0" : "#3182ce",
-              color: "#fff",
-              border: "none",
-              borderRadius: "4px",
-              cursor: isReadOnly ? "not-allowed" : "pointer",
-            }}
-          >
-            {saving ? "Saving..." : "Save"}
-          </button>
-        </form>
-      </div>
-
-      <div
-        style={{
-          padding: "16px",
-          border: "1px solid #e2e8f0",
-          borderRadius: "6px",
-        }}
-      >
-        <h3 style={{ marginBottom: "10px" }}>Your Transactions</h3>
-        {loading ? (
-          <div>Loading...</div>
-        ) : transactions.length === 0 ? (
-          <div style={{ fontSize: "14px", color: "#718096" }}>
-            No transactions yet.
-          </div>
-        ) : (
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: "14px",
-            }}
-          >
-            <thead>
-              <tr>
-                <th style={{ borderBottom: "1px solid #e2e8f0", padding: "6px" }}>
-                  Date
-                </th>
-                <th style={{ borderBottom: "1px solid #e2e8f0", padding: "6px" }}>
-                  Type
-                </th>
-                <th style={{ borderBottom: "1px solid #e2e8f0", padding: "6px" }}>
-                  Amount
-                </th>
-                <th style={{ borderBottom: "1px solid #e2e8f0", padding: "6px" }}>
-                  Description
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.map((t) => (
-                <tr key={t.id}>
-                  <td style={{ borderBottom: "1px solid #edf2f7", padding: "6px" }}>
-                    {new Date(
-                      t.transaction_date || t.transactionDate
-                    ).toLocaleDateString()}
-                  </td>
-                  <td
+      <main style={{ display: 'flex', gap: '2rem' }}>
+        {/* Left: Transactions list */}
+        <section style={{ flex: 1 }}>
+          <h2 style={{ marginBottom: '0.5rem' }}>Your Transactions</h2>
+          {loadingList ? (
+            <p>Loading...</p>
+          ) : transactions.length === 0 ? (
+            <p>No transactions yet.</p>
+          ) : (
+            <table
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: '0.9rem',
+              }}
+            >
+              <thead>
+                <tr>
+                  <th
                     style={{
-                      borderBottom: "1px solid #edf2f7",
-                      padding: "6px",
-                      textTransform: "capitalize",
+                      textAlign: 'left',
+                      borderBottom: '1px solid #ddd',
+                      padding: '0.5rem',
                     }}
                   >
-                    {t.type}
-                  </td>
-                  <td
+                    Date
+                  </th>
+                  <th
                     style={{
-                      borderBottom: "1px solid #edf2f7",
-                      padding: "6px",
-                      color: t.type === "income" ? "#38a169" : "#e53e3e",
+                      textAlign: 'left',
+                      borderBottom: '1px solid #ddd',
+                      padding: '0.5rem',
                     }}
                   >
-                    ₹{t.amount}
-                  </td>
-                  <td style={{ borderBottom: "1px solid #edf2f7", padding: "6px" }}>
-                    {t.description || "-"}
-                  </td>
+                    Type
+                  </th>
+                  <th
+                    style={{
+                      textAlign: 'right',
+                      borderBottom: '1px solid #ddd',
+                      padding: '0.5rem',
+                    }}
+                  >
+                    Amount
+                  </th>
+                  <th
+                    style={{
+                      textAlign: 'left',
+                      borderBottom: '1px solid #ddd',
+                      padding: '0.5rem',
+                    }}
+                  >
+                    Description
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+              </thead>
+              <tbody>
+                {transactions.map(tx => (
+                  <tr
+                    key={
+                      tx.id ||
+                      `${tx.transactionDate}-${tx.amount}-${tx.type}`
+                    }
+                  >
+                    <td
+                      style={{
+                        borderBottom: '1px solid #f1f1f1',
+                        padding: '0.5rem',
+                      }}
+                    >
+                      {tx.transactionDate?.slice(0, 10) || ''}
+                    </td>
+                    <td
+                      style={{
+                        borderBottom: '1px solid #f1f1f1',
+                        padding: '0.5rem',
+                      }}
+                    >
+                      {tx.type}
+                    </td>
+                    <td
+                      style={{
+                        borderBottom: '1px solid #f1f1f1',
+                        padding: '0.5rem',
+                        textAlign: 'right',
+                      }}
+                    >
+                      {tx.amount}
+                    </td>
+                    <td
+                      style={{
+                        borderBottom: '1px solid #f1f1f1',
+                        padding: '0.5rem',
+                      }}
+                    >
+                      {tx.description || '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+
+        {/* Right: Add Transaction form */}
+        <section style={{ width: '320px' }}>
+          <h2 style={{ marginBottom: '0.5rem' }}>Add Transaction</h2>
+          <form onSubmit={handleAddTransaction}>
+            <label style={{ display: 'block', marginBottom: '0.5rem' }}>
+              Amount
+              <input
+                type="number"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  marginTop: '0.25rem',
+                }}
+                required
+              />
+            </label>
+
+            <label style={{ display: 'block', marginBottom: '0.5rem' }}>
+              Type
+              <select
+                value={type}
+                onChange={e => setType(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  marginTop: '0.25rem',
+                }}
+              >
+                <option value="expense">Expense</option>
+                <option value="income">Income</option>
+              </select>
+            </label>
+
+            <label style={{ display: 'block', marginBottom: '0.5rem' }}>
+              Date
+              <input
+                type="date"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  marginTop: '0.25rem',
+                }}
+                required
+              />
+            </label>
+
+            <label style={{ display: 'block', marginBottom: '0.5rem' }}>
+              Description (Optional)
+              <input
+                type="text"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  marginTop: '0.25rem',
+                }}
+              />
+            </label>
+
+            <button
+              type="submit"
+              disabled={saving}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                marginTop: '0.5rem',
+                backgroundColor: '#2563eb',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          </form>
+        </section>
+      </main>
     </div>
   );
 }

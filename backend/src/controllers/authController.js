@@ -1,4 +1,4 @@
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db.js';
 
@@ -9,12 +9,19 @@ export async function registerUser(req, res) {
     const { name, email, password, role } = req.body;
 
     if (!name || !email || !password) {
-      return res.status(400).json({ message: 'Name, email and password are required' });
+      return res
+        .status(400)
+        .json({ message: 'Name, email and password are required' });
     }
 
-    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    const existing = await pool.query(
+      'SELECT id FROM users WHERE email = $1',
+      [email]
+    );
     if (existing.rowCount > 0) {
-      return res.status(409).json({ message: 'User already exists with this email' });
+      return res
+        .status(409)
+        .json({ message: 'User already exists with this email' });
     }
 
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
@@ -23,7 +30,12 @@ export async function registerUser(req, res) {
     const insert =
       'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role, created_at';
 
-    const result = await pool.query(insert, [name, email, passwordHash, userRole]);
+    const result = await pool.query(insert, [
+      name,
+      email,
+      passwordHash,
+      userRole,
+    ]);
     const user = result.rows[0];
 
     const token = jwt.sign(
@@ -44,7 +56,9 @@ export async function loginUser(req, res) {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required' });
+      return res
+        .status(400)
+        .json({ message: 'Email and password are required' });
     }
 
     const result = await pool.query(

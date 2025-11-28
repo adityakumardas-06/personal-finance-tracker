@@ -1,8 +1,9 @@
 // frontend/src/pages/LoginPage.jsx
 import { useState } from 'react';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
+
+const API_BASE = 'http://localhost:5000';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('admin@example.com'); // convenience ke liye
@@ -18,25 +19,53 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
 
+    console.log('HANDLE SUBMIT START', { email, password });
+
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/login', {
-        email,
-        password,
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
       });
 
-      // backend se { user, token } aa raha hai
-      login(res.data.user, res.data.token);
+      console.log('FETCH DONE, status =', res.status);
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        console.log('ERROR RESPONSE BODY =', errData);
+        throw new Error(errData.message || 'Invalid email or password');
+      }
+
+      const data = await res.json();
+      console.log('SUCCESS RESPONSE DATA =', data);
+
+      if (!data.user || !data.token) {
+        throw new Error('Invalid response structure from server');
+      }
+
+      // AuthContext me save + redirect
+      login(data.user, data.token);
       navigate('/dashboard');
     } catch (err) {
-      console.error(err);
-      setError('Invalid email or password');
+      console.error('FRONTEND LOGIN ERROR =>', err);
+      setError(err.message || 'Login failed');
     } finally {
       setLoading(false);
+      console.log('HANDLE SUBMIT END');
     }
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}
+    >
       <form
         onSubmit={handleSubmit}
         style={{
@@ -70,7 +99,13 @@ export default function LoginPage() {
         </label>
 
         {error && (
-          <div style={{ color: 'red', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+          <div
+            style={{
+              color: 'red',
+              marginBottom: '0.5rem',
+              fontSize: '0.9rem',
+            }}
+          >
             {error}
           </div>
         )}
