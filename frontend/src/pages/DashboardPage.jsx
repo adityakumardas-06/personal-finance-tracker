@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 
-const API_BASE = 'http://localhost:5000';
+const API_BASE = 'https://personal-finance-tracker-1nko.onrender.com';
 
 export default function DashboardPage() {
   const { user, token, logout } = useAuth();
